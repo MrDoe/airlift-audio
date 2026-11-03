@@ -38,8 +38,12 @@ def resolve_device(preference: str = "auto") -> str:
     if preference == "cpu":
         return "cpu"
     if preference == "cuda":
+        # Ships with a CPU-only torch wheel; explicitly flag the missing build.
         if not torch.cuda.is_available():
-            raise RuntimeError("CUDA was requested but is not available on this machine.")
+            raise RuntimeError(
+                "CUDA was requested but this build ships CPU-only torch. "
+                "Reinstall torch with CUDA wheels (e.g. cu128) or use --device cpu."
+            )
         return "cuda"
     if preference == "mps":
         if not torch.backends.mps.is_available():
@@ -130,6 +134,10 @@ class ApolloRestorer:
         model.requires_grad_(False)
         self.model = model
         report("Model ready", 1.0)
+
+    def ensure_loaded(self, progress: Progress | None = None) -> None:
+        if self.model is None:
+            self.load(progress)
 
     # -- inference -------------------------------------------------------
     def restore(

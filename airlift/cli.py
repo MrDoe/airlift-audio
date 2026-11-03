@@ -12,7 +12,6 @@ import soundfile as sf
 from . import APP_NAME, __version__
 from .core.apollo import ApolloRestorer, describe_device, resolve_device
 from .core.audio import (
-    BAND_EDGES,
     SAMPLE_RATE,
     apply_shelf,
     band_labels,
@@ -20,7 +19,6 @@ from .core.audio import (
     decode,
     make_ab_clip,
     measure_lufs,
-    rms_dbfs,
 )
 from .core.pipeline import AUDIO_SUFFIXES, EnhanceOptions, enhance_file
 
@@ -86,7 +84,7 @@ def cmd_enhance(args: argparse.Namespace) -> int:
         except KeyboardInterrupt:
             print("\nCancelled.")
             return 130
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — per-file failures must not abort the batch
             failures += 1
             print(f"\n  failed: {exc}", file=sys.stderr)
             continue

@@ -81,6 +81,7 @@ def enhance_file(
         raise CancelledError("Cancelled")
     before = band_levels(audio)
 
+    restorer.ensure_loaded(progress)
     emit("Restoring", 0.05)
     restored = restorer.restore(
         audio,

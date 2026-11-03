@@ -27,7 +27,30 @@ hiddenimports = [
     "soundfile",
     "scipy.signal",
     "PySide6.QtMultimedia",
+    # Airlift's own subpackages: launcher.py only imports airlift.app, so
+    # PyInstaller's static analysis never sees core/cli/ui.
+    "airlift.core",
+    "airlift.core.apollo",
+    "airlift.core.audio",
+    "airlift.core.pipeline",
+    "airlift.cli",
+    "airlift.ui",
+    "airlift.ui.main_window",
+    "airlift.ui.player",
+    "airlift.ui.theme",
+    "airlift.ui.worker",
 ]
+
+# Build with a CPU-only torch wheel. PyInstaller's CUDA hook cannot resolve
+# cuDNN 9.x's split .so files, so shipping a CUDA build breaks GPU inference
+# (cudnnFinalize). The env guard below fails loud if CI drifts.
+import torch as _torch
+
+if _torch.cuda.is_available():
+    raise SystemExit(
+        "Refusing to build: torch reports CUDA available. Build with a CPU wheel "
+        "(pip install torch --index-url https://download.pytorch.org/whl/cpu)."
+    )
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
@@ -36,9 +59,24 @@ a = Analysis(
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
-    hooksconfig={},
+    hooksconfig={"torch": {"disable_cuda": True}},
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "pytest", "IPython", "notebook", "pandas"],
+    excludes=[
+        "tkinter",
+        "matplotlib",
+        "pytest",
+        "IPython",
+        "notebook",
+        "pandas",
+        "torchvision",
+        "torchaudio",
+        # CUDA payload, if a CUDA wheel ever leaks into the build env:
+        "nvidia",
+        "torch._C._cuda",
+        # NOTE: do NOT exclude torch.cuda or torch.distributed — torch/__init__
+        # and torch.utils.data import them unconditionally, and excluding them
+        # raises ModuleNotFoundError at import time.
+    ],
     noarchive=False,
 )
 

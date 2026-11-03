@@ -29,7 +29,9 @@ hallucinated edges of a pure super-resolution model.
   any time, results are never overwritten silently.
 - **A/B listening**: switch between original and enhanced at the same
   position, with loudness-matched clip export and the band-delta table.
-- **CPU, CUDA or Apple MPS** — automatic device selection.
+- **CPU, CUDA or Apple MPS** — automatic device selection. *Shipped
+  installers bundle CPU-only torch; CUDA and MPS work only when you install
+  torch with those wheels yourself (see Build from source).*
 - **WAV float or 24-bit FLAC** output, side-by-side with the source.
 - **CLI**: `airlift-audio enhance`, `compare`, `devices`.
 
@@ -45,8 +47,8 @@ tool), so your OS may ask you to allow the app once.
 | Linux (Ubuntu 22.04+) | `*.AppImage` or `*.deb` |
 
 Releases are built in CI from tags. On first run the app downloads the
-66 MB model weights and then works offline. On Windows/Linux with an NVIDIA
-GPU, CUDA is picked up automatically when available.
+66 MB model weights and then works offline. The installers are CPU-only
+bundles; there is no GPU acceleration in the shipped build.
 
 ## Build from source
 
@@ -72,6 +74,7 @@ pytest
 ### Build an installer
 
 ```bash
+python packaging/check_release.py          # gate: no CUDA leakage into the CPU bundle
 python -m PyInstaller packaging/airlift.spec     # one-folder bundle in dist/
 # Linux: bash packaging/linux/build_appimage.sh
 # macOS: bash packaging/macos/build_dmg.sh
@@ -97,6 +100,10 @@ airlift-audio enhance ./tracks/ --device auto
 airlift-audio compare original.wav enhanced.wav --start 75
 airlift-audio devices
 ```
+
+Every option has a `--help` entry; `airlift-cli` is the same dispatcher —
+for example, `airlift-cli devices` prints which backends are available.
+Use whichever entry point you have installed.
 
 ## Measured behaviour (why the defaults)
 
@@ -126,7 +133,19 @@ airlift/
 packaging/     PyInstaller spec + per-OS installer scripts
 scripts/       icon generation
 tests/         core + CLI tests
+
+OWL/ — documentation and specifications live in docs/; screenshots in
+docs/screenshot.png
 ```
+
+## Documentation
+
+- [Measured behaviour & benchmarks](#measured-behaviour-why-the-defaults) — why the
+  air shelf is +2.5 dB at 9 kHz, and what Apollo does to real tracks.
+- [Credits and licenses](#credits-and-licenses) — MIT app code, CC BY-SA Apollo
+  weights and model code.
+- [Limitations](#limitations) — 44.1 kHz ceiling, restoration-only scope,
+  CPU speed expectations.
 
 ## Credits and licenses
 
@@ -144,4 +163,5 @@ tests/         core + CLI tests
   possible; generated masters usually contain nothing there anyway.
 - Apollo is a restoration model, not a mastering suite: it removes codec
   damage but adds no arrangement, level or dynamics changes.
-- CPU inference is roughly 0.5–1× the track length; CUDA is ~2.7× realtime.
+- CPU inference is roughly 0.5–1× the track length (the bundled installers
+  are CPU-only wheels).

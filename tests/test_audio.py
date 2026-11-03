@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import soundfile as sf
 
 from airlift.core.audio import (
@@ -66,3 +67,48 @@ def test_output_naming(tmp_path):
     assert raw.name == "song.enhanced.wav"
     assert air.name == "song.enhanced.air.wav"
     assert flac.name == "song.enhanced.air.flac"
+
+
+# -- edge cases -----------------------------------------------------------
+
+
+def test_band_levels_empty_short():
+    """Silent/sparse audio must not raise; just return a dict."""
+    audio = np.zeros((1_000, 2), dtype=np.float32)
+    levels = band_levels(audio)
+    assert isinstance(levels, dict)
+
+
+def test_band_levels_all_bands_present():
+    rng = np.random.default_rng(2)
+    audio = rng.normal(0, 0.3, (SAMPLE_RATE * 3, 2)).astype(np.float32)
+    levels = band_levels(audio)
+    assert set(levels) == set(band_labels())
+    assert all(isinstance(v, float) for v in levels.values())
+
+
+def test_shelf_zero_gain_is_near_passthrough():
+    rng = np.random.default_rng(3)
+    audio = rng.normal(0, 0.2, (SAMPLE_RATE, 2)).astype(np.float32)
+    out = apply_shelf(audio, 9_000, 0.0)
+    assert out.shape == audio.shape
+    assert np.allclose(out, audio, atol=3e-2)
+
+
+def test_make_ab_clip_short_input():
+    """A clip asked from beyond the end must still return audio."""
+    audio = np.full((SAMPLE_RATE, 2), 0.1, dtype=np.float32)
+    clip = make_ab_clip(audio, audio, start_seconds=0.9, seconds=0.5)
+    assert len(clip) > 0
+    assert clip.shape[1] == 2
+
+
+def test_make_ab_clip_clips_loud():
+    loud = np.full((SAMPLE_RATE * 2, 2), 3.0, dtype=np.float32)
+    clip = make_ab_clip(loud, loud, seconds=2.0, block_seconds=1.0)
+    assert float(np.max(np.abs(clip))) <= 0.999
+
+
+def test_decode_raises_for_missing_file(tmp_path):
+    with pytest.raises((FileNotFoundError, RuntimeError, OSError)):
+        decode(tmp_path / "nope.wav")
