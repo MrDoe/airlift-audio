@@ -1,0 +1,5 @@
+include LICENSE
+include README.md
+recursive-include airlift/assets *
+recursive-include airlift/third_party *.py LICENSE README.md
+recursive-include packaging *

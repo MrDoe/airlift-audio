@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Airlift Audio
+GenericName=Audio Restoration
+Comment=Local AI restoration for lossy and codec-damaged music
+Exec=airlift-audio %F
+Icon=airlift-audio
+Terminal=false
+Categories=AudioVideo;Audio;Qt;
+MimeType=audio/wav;audio/x-wav;audio/flac;audio/mpeg;audio/ogg;
+StartupWMClass=airlift-audio

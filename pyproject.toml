@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airlift-audio"
+version = "0.1.0"
+description = "Local AI restoration for lossy and codec-damaged music"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Airlift Audio contributors" }]
+keywords = ["audio", "restoration", "super-resolution", "music", "apollo", "qt"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "soundfile>=0.12",
+    "torch>=2.0",
+    "huggingface-hub>=0.23",
+    "omegaconf>=2.3",
+    "platformdirs>=4.0",
+    "PySide6>=6.6",
+    "imageio-ffmpeg>=0.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pillow>=10.0",
+    "pyinstaller>=6.6",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+airlift-audio = "airlift.app:main"
+airlift-cli = "airlift.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["airlift*"]
+
+[tool.setuptools.package-data]
+airlift = ["assets/*"]
+"airlift.third_party.apollo" = ["LICENSE", "README.md", "look2hear/models/*.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
