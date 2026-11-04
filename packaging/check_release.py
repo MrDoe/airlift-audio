@@ -11,7 +11,28 @@ import sys
 
 
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-cuda",
+        action="store_true",
+        help="Require CUDA (for packaging/airlift-cuda.spec) instead of forbidding it.",
+    )
+    args = parser.parse_args()
+
     import torch
+
+    if args.allow_cuda:
+        if not torch.cuda.is_available():
+            print(
+                "ERROR: --allow-cuda was given but torch reports no CUDA. "
+                "Build with a CUDA wheel (e.g. ~/.venvs/airlift-dev).",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"OK: torch {torch.__version__} has CUDA; building GPU bundle.")
+        return 0
 
     if torch.cuda.is_available():
         print(

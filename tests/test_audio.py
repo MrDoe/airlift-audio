@@ -106,7 +106,9 @@ def test_make_ab_clip_short_input():
 def test_make_ab_clip_clips_loud():
     loud = np.full((SAMPLE_RATE * 2, 2), 3.0, dtype=np.float32)
     clip = make_ab_clip(loud, loud, seconds=2.0, block_seconds=1.0)
-    assert float(np.max(np.abs(clip))) <= 0.999
+    # float32 cannot represent 0.999 exactly (float32(0.999) == 0.99900001),
+    # so allow one ulp of headroom; the point is it stays below full scale.
+    assert float(np.max(np.abs(clip))) <= 0.999001
 
 
 def test_decode_raises_for_missing_file(tmp_path):

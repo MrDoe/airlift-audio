@@ -69,10 +69,15 @@ def decode(path: str | Path, sample_rate: int = SAMPLE_RATE) -> tuple[np.ndarray
     containers libsndfile cannot read (M4A/AAC/Opus in some builds).
     """
     path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"No such file: {path}")
     try:
         data, sr = sf.read(str(path), always_2d=True, dtype="float32")
     except Exception:
-        data, sr = _decode_ffmpeg(path)
+        try:
+            data, sr = _decode_ffmpeg(path)
+        except Exception as ffmpeg_exc:
+            raise RuntimeError(f"Could not decode {path}: {ffmpeg_exc}") from ffmpeg_exc
 
     source_sr = int(sr)
     source_channels = int(data.shape[1])
@@ -217,5 +222,7 @@ def make_ab_clip(
     clip = np.concatenate(pieces, axis=0)
     peak = float(np.max(np.abs(clip)))
     if peak > 0.999:
-        clip *= 0.999 / peak
+        clip = (clip * (0.999 / peak)).astype(np.float32)
+        # float32 rounding can push the peak a hair over 0.999; hard-clip.
+        np.clip(clip, -0.999, 0.999, out=clip)
     return clip
