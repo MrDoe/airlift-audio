@@ -56,19 +56,31 @@ if not _torch.cuda.is_available():
         "(e.g. ~/.venvs/airlift-dev) or use packaging/airlift.spec for CPU."
     )
 
-# Pin NCCL from the same prefix as torch. airlift-dev carries an
+# Pin GPU libs from the same prefix as torch. airlift-dev carries an
 # airlift-shared.pth exposing an older venv (audio-enhance, torch 2.8/cu12)
-# on sys.path; PyInstaller's nvidia.nccl hook can otherwise collect the stale
-# libnccl.so.2 (2.27.3, missing ncclCommResume) instead of the 2.30.7 that
-# torch 2.15+cu132 requires. User-supplied binaries win TOC dedup, so this
-# explicit pin takes precedence over the hook's entry.
+# on sys.path; PyInstaller's nvidia.* hooks can otherwise collect stale
+# libraries (e.g. libnccl.so.2 2.27.3, missing ncclCommResume) instead of the
+# ones torch 2.15+cu132 requires. User-supplied binaries win TOC dedup, so
+# these explicit pins take precedence over hook entries.
+#
+# The nvidia/cu13 mega-package (libnvrtc et al.) has NO PyInstaller hook, so
+# its libraries only enter via binary-dependency analysis (DT_NEEDED). Files
+# loaded with dlopen at runtime — notably libnvrtc-builtins.so, which
+# libnvrtc requires in its own directory for torch.compile/Inductor kernels
+# — are silently dropped without this pin.
 _SITE = Path(_torch.__file__).resolve().parent.parent
-_NCCL_LIB = _SITE / "nvidia" / "nccl" / "lib"
-_cuda_binaries: list[tuple[str, str]] = [
-    (str(p), "nvidia/nccl/lib") for p in sorted(_NCCL_LIB.glob("libnccl.so*"))
-]
-if not _cuda_binaries:
-    raise SystemExit(f"CUDA build: no libnccl found under {_NCCL_LIB}")
+_PINNED_LIB_DIRS: tuple[tuple[str, str], ...] = (
+    ("nvidia/nccl/lib", "nvidia/nccl/lib"),  # NCCL (undefined-symbol risk)
+    ("nvidia/cu13/lib", "nvidia/cu13/lib"),  # CUDA toolkit inc. NVRTC
+)
+_cuda_binaries: list[tuple[str, str]] = []
+for _src_rel, _dst in _PINNED_LIB_DIRS:
+    _found = sorted((_SITE / _src_rel).glob("lib*.so*"))
+    _cuda_binaries.extend((str(p), _dst) for p in _found)
+if not any("libnccl.so" in Path(s).name for s, _ in _cuda_binaries):
+    raise SystemExit(f"CUDA build: no libnccl found under {_SITE}")
+if not any("libnvrtc-builtins" in Path(s).name for s, _ in _cuda_binaries):
+    raise SystemExit(f"CUDA build: no libnvrtc-builtins found under {_SITE}")
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
