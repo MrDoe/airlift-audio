@@ -25,10 +25,15 @@ hallucinated edges of a pure super-resolution model.
   without seams.
 - **Built-in "air" shelf**: a +2.5 dB high shelf at 9 kHz by default, which
   compensates for Apollo's measurable treble tilt.
-- **Batch queue**: add files or a whole folder, process sequentially, cancel
-  any time, results are never overwritten silently.
+- **Batch queue**: add files or a whole folder, multi-select, retry failed
+  items, clear completed, process sequentially and cancel any time.
+- **Transport controls**: Play/Pause/Stop in the queue and the comparison
+  panel; double-click a row or press Space to preview. Finished files play
+  the enhanced version, pending files play the original.
 - **A/B listening**: switch between original and enhanced at the same
   position, with loudness-matched clip export and the band-delta table.
+- **Studio-style UI**: settings rail with presets, status chips, per-row
+  progress, an empty drop-zone state and a keyboard-friendly layout.
 - **CPU, CUDA or Apple MPS** — automatic device selection. *Shipped
   installers bundle CPU-only torch; CUDA and MPS work only when you install
   torch with those wheels yourself (see Build from source).*
@@ -55,7 +60,7 @@ bundles; there is no GPU acceleration in the shipped build.
 ## Build from source
 
 ```bash
-git clone https://github.com/<org>/airlift-audio
+git clone https://github.com/MrDoe/airlift-audio
 cd airlift-audio
 python -m venv .venv
 . .venv/bin/activate
@@ -109,7 +114,7 @@ CUDA AppImage + `.deb` (Linux):
 ```bash
 PYTHON=~/.venvs/airlift-dev/bin/python VARIANT=cuda \
     bash packaging/linux/build_appimage.sh
-sudo apt install ./dist/airlift-audio-cuda_0.1.1_amd64.deb
+sudo apt install ./dist/airlift-audio-cuda_0.1.3_amd64.deb
 ```
 
 The CUDA bundle writes to `dist/Airlift Audio CUDA` and installs as
@@ -125,11 +130,17 @@ window, press **Enhance**, then listen with the A/B control and read the
 band-delta table. The default settings produce `<name>.enhanced.air.wav`
 next to the source.
 
+The left rail holds the restoration settings, presets and advanced chunking
+options. The queue supports multi-select, a context menu, retry failed and
+clear completed. **Play** previews the selected file, **Separate stems**
+opens the Demucs dialog, and the comparison panel appears once a file has
+been enhanced.
+
 **Tools → Separate stems** runs Demucs on the selected file (or the whole
 queue) and writes `<name>.vocals.wav` plus `<name>.instrumental.wav`; tick
 "four stems" for drums, bass and other. The result can be added to the queue
-so the stems run through Apollo afterwards. The queue's **Play** button
-previews the selected file; **Separate stems** opens the same dialog.
+so the stems run through Apollo afterwards.
+
 ### CLI
 
 ```bash

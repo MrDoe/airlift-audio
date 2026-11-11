@@ -119,7 +119,7 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleName": "Airlift Audio",
             "CFBundleDisplayName": "Airlift Audio",
-            "CFBundleShortVersionString": "0.1.2",
+            "CFBundleShortVersionString": "0.1.3",
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
         },

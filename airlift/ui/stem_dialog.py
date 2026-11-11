@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from .. import APP_NAME
 from ..core.stems import DEFAULT_MODEL, MODELS, StemOptions
+from .icons import icon
 from .worker import StemWorker
 
 DEVICES = (("Auto", "auto"), ("CPU", "cpu"), ("CUDA", "cuda"), ("Apple MPS", "mps"))
@@ -51,7 +52,8 @@ class StemDialog(QDialog):
         self.worker: StemWorker | None = None
 
         self.setWindowTitle("Separate stems")
-        self.setMinimumWidth(580)
+        self.setMinimumWidth(620)
+        self.resize(640, 620)
         self._build(
             device=device,
             output_dir=output_dir,
@@ -67,16 +69,23 @@ class StemDialog(QDialog):
         demucs_python: str | None,
     ) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
 
-        headline = QLabel(
+        headline = QLabel("Separate stems")
+        headline.setProperty("role", "title")
+        layout.addWidget(headline)
+
+        description = QLabel(
             f"Split {len(self.files)} file(s) into vocals and instrumental with Demucs."
         )
-        headline.setWordWrap(True)
-        layout.addWidget(headline)
+        description.setProperty("role", "muted")
+        description.setWordWrap(True)
+        layout.addWidget(description)
 
         self.file_list = QListWidget()
         self.file_list.setSelectionMode(QListWidget.NoSelection)
-        self.file_list.setMaximumHeight(130)
+        self.file_list.setMaximumHeight(120)
         for path in self.files:
             self.file_list.addItem(str(path))
         layout.addWidget(self.file_list)
@@ -104,21 +113,26 @@ class StemDialog(QDialog):
         out_row = QHBoxLayout()
         self.output_edit = QLineEdit(str(output_dir) if output_dir else "")
         self.output_edit.setPlaceholderText("next to each source file")
-        out_btn = QPushButton("Browse…")
-        out_btn.clicked.connect(self._pick_output)
+        self.out_btn = QPushButton("Browse…")
+        self.out_btn.clicked.connect(self._pick_output)
         out_row.addWidget(self.output_edit, 1)
-        out_row.addWidget(out_btn)
+        out_row.addWidget(self.out_btn)
         form.addRow("Output folder", out_row)
 
         self.four_stems = QCheckBox("Also write drums, bass and other")
         form.addRow("", self.four_stems)
 
+        py_row = QHBoxLayout()
         self.python_edit = QLineEdit(demucs_python or "")
         self.python_edit.setPlaceholderText("auto (AIRLIFT_DEMUCS_PYTHON or this Python)")
         self.python_edit.setToolTip(
             "Interpreter that can import demucs. Leave empty to auto-detect."
         )
-        form.addRow("Demucs Python", self.python_edit)
+        py_row.addWidget(self.python_edit, 1)
+        self.py_btn = QPushButton("Browse…")
+        self.py_btn.clicked.connect(self._pick_python)
+        py_row.addWidget(self.py_btn)
+        form.addRow("Demucs Python", py_row)
         layout.addWidget(box)
 
         self.add_to_queue = QCheckBox("Add the separated stems to the queue")
@@ -128,19 +142,23 @@ class StemDialog(QDialog):
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
+        self.progress.setFixedHeight(8)
         layout.addWidget(self.progress)
 
         self.status = QLabel("Ready.")
-        self.status.setStyleSheet("color: #8b95a5;")
+        self.status.setProperty("role", "muted")
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         self.start_btn = QPushButton("Separate")
+        self.start_btn.setProperty("variant", "primary")
+        self.start_btn.setIcon(icon("layers", "#06201C"))
         self.start_btn.setDefault(True)
         self.start_btn.clicked.connect(self._start)
         self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setProperty("variant", "ghost")
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.clicked.connect(self._cancel)
         self.close_btn = QPushButton("Close")
@@ -154,6 +172,14 @@ class StemDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(self, "Output folder")
         if folder:
             self.output_edit.setText(folder)
+
+    def _pick_python(self) -> None:
+        start = str(Path(self.python_edit.text()).parent) if self.python_edit.text() else str(Path.home())
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select a Python interpreter with Demucs", start, "All files (*)"
+        )
+        if path:
+            self.python_edit.setText(path)
 
     # --------------------------------------------------------------- run
     def _options(self) -> StemOptions:
@@ -248,8 +274,10 @@ class StemDialog(QDialog):
             self.device_combo,
             self.format_combo,
             self.output_edit,
+            self.out_btn,
             self.four_stems,
             self.python_edit,
+            self.py_btn,
             self.add_to_queue,
         ):
             widget.setEnabled(not running)

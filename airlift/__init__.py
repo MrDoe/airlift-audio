@@ -1,6 +1,6 @@
 """Airlift Audio — local AI restoration for lossy and codec-damaged music."""
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 APP_NAME = "Airlift Audio"
 APP_ID = "airlift-audio"
