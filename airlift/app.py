@@ -13,6 +13,7 @@ Usage:
   airlift-audio                      launch the GUI
   airlift-audio enhance FILE...      restore from the command line
   airlift-audio compare A B          render an A/B clip
+  airlift-audio separate FILE...     split into vocals + instrumental (Demucs)
   airlift-audio devices              show CUDA / MPS availability
   airlift-audio --version
 
@@ -22,7 +23,7 @@ Run `airlift-audio enhance --help` for the full option list.
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    if args and args[0] in {"enhance", "compare", "devices"}:
+    if args and args[0] in {"enhance", "compare", "separate", "devices"}:
         from .cli import main as cli_main
 
         return cli_main(args)

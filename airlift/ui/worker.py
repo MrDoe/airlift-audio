@@ -9,6 +9,7 @@ from PySide6.QtCore import QThread, Signal
 
 from ..core.apollo import ApolloRestorer, CancelledError
 from ..core.pipeline import EnhanceOptions, enhance_file
+from ..core.stems import DemucsUnavailable, StemOptions, resolve_python, separate_file
 
 
 class BatchWorker(QThread):
@@ -41,7 +42,7 @@ class BatchWorker(QThread):
     def cancelled(self) -> bool:
         return self._cancel.is_set()
 
-    def run(self) -> None:  # noqa: D401 - Qt entry point
+    def run(self) -> None:
         try:
             if self.restorer is None:
                 self.model_status.emit("Preparing model", 0.0)
@@ -50,7 +51,7 @@ class BatchWorker(QThread):
                     lambda stage, fraction: self.model_status.emit(stage, fraction)
                 )
                 self.model_status.emit("Model ready", 1.0)
-        except Exception as exc:  # model problems are fatal for the batch
+        except Exception as exc:  # model problems are fatal for the batch  # noqa: BLE001
             self.fatal.emit(f"Could not load the model: {exc}")
             self.finished_all.emit()
             return
@@ -71,7 +72,64 @@ class BatchWorker(QThread):
                 self.item_done.emit(index, result)
             except CancelledError:
                 break
-            except Exception as exc:  # keep the rest of the batch alive
+            except Exception as exc:  # keep the rest of the batch alive  # noqa: BLE001
                 self.item_failed.emit(index, str(exc))
 
         self.finished_all.emit()
+
+
+class StemWorker(QThread):
+    """Run Demucs over a list of files, one at a time."""
+
+    item_progress = Signal(int, str, float)
+    item_done = Signal(int, object)
+    item_failed = Signal(int, str)
+    fatal = Signal(str)
+    finished_all = Signal()
+
+    def __init__(
+        self,
+        jobs: list[Path],
+        options: StemOptions,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.jobs = jobs
+        self.options = options
+        self._cancel = threading.Event()
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancel.is_set()
+
+    def run(self) -> None:
+        try:
+            resolve_python(self.options.demucs_python)
+        except DemucsUnavailable as exc:
+            self.fatal.emit(str(exc))
+            self.finished_all.emit()
+            return
+
+        try:
+            for index, path in enumerate(self.jobs):
+                if self._cancel.is_set():
+                    break
+                try:
+                    result = separate_file(
+                        path,
+                        self.options,
+                        progress=lambda stage, fraction, i=index: self.item_progress.emit(
+                            i, stage, fraction
+                        ),
+                        cancel=self._cancel.is_set,
+                    )
+                    self.item_done.emit(index, result)
+                except CancelledError:
+                    break
+                except Exception as exc:  # keep the rest of the batch alive  # noqa: BLE001
+                    self.item_failed.emit(index, str(exc))
+        finally:
+            self.finished_all.emit()

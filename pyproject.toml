@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "airlift-audio"
-version = "0.1.1"
+version = "0.1.2"
 description = "Local AI restoration for lossy and codec-damaged music"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,6 +44,11 @@ dev = [
     "pillow>=10.0",
     "pyinstaller>=6.6",
     "ruff>=0.6",
+]
+# Optional stem separation. Installed separately from the app because Demucs
+# needs a torchaudio build that matches torch; `pip install -e .[stems]`.
+stems = [
+    "demucs>=4.0",
 ]
 
 [project.scripts]

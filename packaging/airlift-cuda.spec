@@ -38,10 +38,12 @@ hiddenimports = [
     "airlift.core.apollo",
     "airlift.core.audio",
     "airlift.core.pipeline",
+    "airlift.core.stems",
     "airlift.cli",
     "airlift.ui",
     "airlift.ui.main_window",
     "airlift.ui.player",
+    "airlift.ui.stem_dialog",
     "airlift.ui.theme",
     "airlift.ui.worker",
 ]
@@ -146,7 +148,7 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleName": "Airlift Audio CUDA",
             "CFBundleDisplayName": "Airlift Audio CUDA",
-            "CFBundleShortVersionString": "0.1.0",
+            "CFBundleShortVersionString": "0.1.2",
             "NSHighResolutionCapable": True,
             "LSMinimumSystemVersion": "12.0",
         },

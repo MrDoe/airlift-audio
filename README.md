@@ -33,7 +33,9 @@ hallucinated edges of a pure super-resolution model.
   installers bundle CPU-only torch; CUDA and MPS work only when you install
   torch with those wheels yourself (see Build from source).*
 - **WAV float or 24-bit FLAC** output, side-by-side with the source.
-- **CLI**: `airlift-audio enhance`, `compare`, `devices`.
+- **Stem separation** (optional): split a track into vocals + instrumental
+  with Demucs, from **Tools → Separate stems** or `airlift-cli separate`.
+- **CLI**: `airlift-audio enhance`, `compare`, `separate`, `devices`.
 
 ## Download
 
@@ -64,6 +66,27 @@ airlift-audio         # GUI
 
 GPU variant: `pip install torch --index-url https://download.pytorch.org/whl/cu128`.
 
+### Optional: stem separation
+
+Demucs is not bundled (the installers stay lean and CPU-only). Install it into
+the app's environment — or any other virtualenv that has a `torchaudio` matching
+its `torch`:
+
+```bash
+pip install -e .[stems]
+```
+
+If Demucs lives in a different environment, point Airlift at it instead of
+installing it twice:
+
+```bash
+export AIRLIFT_DEMUCS_PYTHON=~/.venvs/demucs/bin/python   # or:
+airlift-cli separate song.wav --demucs-python ~/.venvs/demucs/bin/python
+```
+
+The GUI has the same field in **Tools → Separate stems**. Without a working
+Demucs the rest of the app is unaffected; the command explains what it tried.
+
 ### Run the tests
 
 ```bash
@@ -81,6 +104,18 @@ python -m PyInstaller packaging/airlift.spec     # one-folder bundle in dist/
 # Windows: packaging/windows/build.ps1
 ```
 
+CUDA AppImage + `.deb` (Linux):
+
+```bash
+PYTHON=~/.venvs/airlift-dev/bin/python VARIANT=cuda \
+    bash packaging/linux/build_appimage.sh
+sudo apt install ./dist/airlift-audio-cuda_0.1.1_amd64.deb
+```
+
+The CUDA bundle writes to `dist/Airlift Audio CUDA` and installs as
+`airlift-audio-cuda` (`/usr/bin/airlift-audio-cuda`), so it can coexist with
+the CPU install.
+
 ## Usage
 
 ### GUI
@@ -90,6 +125,11 @@ window, press **Enhance**, then listen with the A/B control and read the
 band-delta table. The default settings produce `<name>.enhanced.air.wav`
 next to the source.
 
+**Tools → Separate stems** runs Demucs on the selected file (or the whole
+queue) and writes `<name>.vocals.wav` plus `<name>.instrumental.wav`; tick
+"four stems" for drums, bass and other. The result can be added to the queue
+so the stems run through Apollo afterwards. The queue's **Play** button
+previews the selected file; **Separate stems** opens the same dialog.
 ### CLI
 
 ```bash
@@ -97,6 +137,8 @@ airlift-audio enhance song.mp3                    # -> song.enhanced.air.wav
 airlift-audio enhance song.mp3 --shelf 0          # raw model output, no EQ
 airlift-audio enhance song.flac --format flac -o out/
 airlift-audio enhance ./tracks/ --device auto
+airlift-audio separate song.wav                 # vocals + instrumental
+airlift-audio separate song.wav --four-stems    # drums, bass, other too
 airlift-audio compare original.wav enhanced.wav --start 75
 airlift-audio devices
 ```

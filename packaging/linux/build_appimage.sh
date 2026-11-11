@@ -1,33 +1,78 @@
 #!/usr/bin/env bash
 # Build a Linux AppImage and .deb from a PyInstaller one-folder build.
+#
+# CPU (default):  bash packaging/linux/build_appimage.sh
+# CUDA variant:   VARIANT=cuda bash packaging/linux/build_appimage.sh
+#                 (needs a CUDA torch wheel, e.g. ~/.venvs/airlift-dev)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.1.2}"
 ARCH="$(uname -m)"
+PYTHON="${PYTHON:-python}"
 DIST="$ROOT/dist"
-APP_NAME="Airlift Audio"
 
-python -m PyInstaller packaging/airlift.spec --noconfirm
+VARIANT="${VARIANT:-cpu}"
+case "$VARIANT" in
+    cpu)
+        SPEC="packaging/airlift.spec"
+        APP_NAME="Airlift Audio"
+        PACKAGE="airlift-audio"
+        BIN_NAME="airlift-audio"
+        ICON_NAME="airlift-audio"
+        OUT_SLUG="Airlift-Audio"
+        INSTALL_DIR="airlift-audio"
+        GATE_ARGS=()
+        ;;
+    cuda)
+        SPEC="packaging/airlift-cuda.spec"
+        APP_NAME="Airlift Audio CUDA"
+        PACKAGE="airlift-audio-cuda"
+        BIN_NAME="airlift-audio-cuda"
+        ICON_NAME="airlift-audio-cuda"
+        OUT_SLUG="Airlift-Audio-CUDA"
+        INSTALL_DIR="airlift-audio-cuda"
+        GATE_ARGS=(--allow-cuda)
+        ;;
+    *)
+        echo "Unknown VARIANT='$VARIANT' (use cpu or cuda)" >&2
+        exit 2
+        ;;
+esac
+
+case "$ARCH" in
+    x86_64) DEB_ARCH="amd64" ;;
+    aarch64|arm64) DEB_ARCH="arm64" ;;
+    *) DEB_ARCH="$ARCH" ;;
+esac
+
+"$PYTHON" packaging/check_release.py "${GATE_ARGS[@]}"
+"$PYTHON" -m PyInstaller "$SPEC" --noconfirm
 
 APPDIR="$ROOT/build/AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR/usr/bin" \
-         "$APPDIR/usr/lib/airlift-audio" \
+         "$APPDIR/usr/lib/$INSTALL_DIR" \
          "$APPDIR/usr/share/applications" \
          "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 
-cp -a "$DIST/$APP_NAME/." "$APPDIR/usr/lib/airlift-audio/"
-ln -sf "../lib/airlift-audio/$APP_NAME" "$APPDIR/usr/bin/airlift-audio"
-cp airlift/assets/icon.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/airlift-audio.png"
-cp airlift/assets/icon.png "$APPDIR/airlift-audio.png"
-cp packaging/linux/airlift-audio.desktop "$APPDIR/"
+cp -a "$DIST/$APP_NAME/." "$APPDIR/usr/lib/$INSTALL_DIR/"
+ln -sf "../lib/$INSTALL_DIR/$APP_NAME" "$APPDIR/usr/bin/$BIN_NAME"
+cp airlift/assets/icon.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/$ICON_NAME.png"
+cp airlift/assets/icon.png "$APPDIR/$ICON_NAME.png"
+cp packaging/linux/airlift-audio.desktop "$APPDIR/$ICON_NAME.desktop"
+sed -i \
+    -e "s/^Name=.*/Name=$APP_NAME/" \
+    -e "s/^Exec=.*/Exec=$BIN_NAME %F/" \
+    -e "s/^Icon=.*/Icon=$ICON_NAME/" \
+    -e "s/^StartupWMClass=.*/StartupWMClass=$ICON_NAME/" \
+    "$APPDIR/$ICON_NAME.desktop"
 
-cat > "$APPDIR/AppRun" <<'EOF'
+cat > "$APPDIR/AppRun" <<EOF
 #!/bin/sh
-HERE=$(dirname "$(readlink -f "$0")")
-exec "$HERE/usr/lib/airlift-audio/Airlift Audio" "$@"
+HERE=\$(dirname "\$(readlink -f "\$0")")
+exec "\$HERE/usr/lib/$INSTALL_DIR/$APP_NAME" "\$@"
 EOF
 chmod +x "$APPDIR/AppRun"
 
@@ -38,26 +83,26 @@ if [ ! -x "$TOOL" ]; then
     chmod +x "$TOOL"
 fi
 ARCH="$ARCH" "$TOOL" --appimage-extract-and-run "$APPDIR" \
-    "$DIST/Airlift-Audio-${VERSION}-${ARCH}.AppImage"
+    "$DIST/${OUT_SLUG}-${VERSION}-${ARCH}.AppImage"
 
 # ---------------------------------------------------------------- .deb
-DEB="$ROOT/build/deb"
+DEB="$ROOT/build/deb-$VARIANT"
 rm -rf "$DEB"
-mkdir -p "$DEB/DEBIAN" "$DEB/opt/airlift-audio" "$DEB/usr/bin" \
+mkdir -p "$DEB/DEBIAN" "$DEB/opt/$INSTALL_DIR" "$DEB/usr/bin" \
          "$DEB/usr/share/applications" \
          "$DEB/usr/share/icons/hicolor/256x256/apps"
-cp -a "$DIST/$APP_NAME/." "$DEB/opt/airlift-audio/"
-ln -sf "/opt/airlift-audio/$APP_NAME" "$DEB/usr/bin/airlift-audio"
-cp packaging/linux/airlift-audio.desktop "$DEB/usr/share/applications/"
-cp airlift/assets/icon.png "$DEB/usr/share/icons/hicolor/256x256/apps/airlift-audio.png"
-SIZE_KB="$(du -sk "$DEB/opt/airlift-audio" | cut -f1)"
+cp -a "$DIST/$APP_NAME/." "$DEB/opt/$INSTALL_DIR/"
+ln -sf "/opt/$INSTALL_DIR/$APP_NAME" "$DEB/usr/bin/$BIN_NAME"
+cp "$APPDIR/$ICON_NAME.desktop" "$DEB/usr/share/applications/"
+cp airlift/assets/icon.png "$DEB/usr/share/icons/hicolor/256x256/apps/$ICON_NAME.png"
+SIZE_KB="$(du -sk "$DEB/opt/$INSTALL_DIR" | cut -f1)"
 
 cat > "$DEB/DEBIAN/control" <<EOF
-Package: airlift-audio
+Package: ${PACKAGE}
 Version: ${VERSION}
 Section: sound
 Priority: optional
-Architecture: amd64
+Architecture: ${DEB_ARCH}
 Installed-Size: ${SIZE_KB}
 Maintainer: Airlift Audio contributors
 Description: Local AI restoration for lossy and codec-damaged music
@@ -65,5 +110,5 @@ Description: Local AI restoration for lossy and codec-damaged music
 EOF
 
 dpkg-deb --build --root-owner-group "$DEB" \
-    "$DIST/airlift-audio_${VERSION}_amd64.deb"
-echo "built: $DIST/Airlift-Audio-${VERSION}-${ARCH}.AppImage and .deb"
+    "$DIST/${PACKAGE}_${VERSION}_${DEB_ARCH}.deb"
+echo "built: $DIST/${OUT_SLUG}-${VERSION}-${ARCH}.AppImage and ${PACKAGE}_${VERSION}_${DEB_ARCH}.deb"

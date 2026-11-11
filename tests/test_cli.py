@@ -15,3 +15,12 @@ def test_compare_defaults():
     args = build_parser().parse_args(["compare", "a.wav", "b.wav"])
     assert args.seconds == 40.0
     assert args.block == 8.0
+
+
+def test_separate_defaults():
+    args = build_parser().parse_args(["separate", "song.wav"])
+    assert args.model == "htdemucs"
+    assert args.device == "auto"
+    assert args.format == "wav"
+    assert args.four_stems is False
+    assert args.demucs_python is None

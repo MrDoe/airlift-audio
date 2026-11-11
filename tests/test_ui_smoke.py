@@ -13,6 +13,15 @@ def test_app_usage():
     from airlift.app import USAGE
 
     assert "enhance" in USAGE
+    assert "separate" in USAGE
+
+
+def test_stem_ui_imports():
+    from airlift.ui.stem_dialog import StemDialog
+    from airlift.ui.worker import StemWorker
+
+    assert hasattr(StemDialog, "stems_ready")
+    assert hasattr(StemWorker, "cancel")
 
 
 def test_ui_core_mocks():

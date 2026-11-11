@@ -7,7 +7,6 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import soundfile as sf
 from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QKeySequence
@@ -44,19 +43,16 @@ from ..core.audio import (
     BAND_EDGES,
     SAMPLE_RATE,
     band_labels,
-    band_levels,
     decode,
     make_ab_clip,
     measure_lufs,
-    write_audio,
 )
 from ..core.pipeline import (
     AUDIO_SUFFIXES,
     EnhanceOptions,
     EnhanceResult,
-    output_path,
 )
-from .player import ABPlayer
+from .player import MULTIMEDIA, ABPlayer
 
 COLUMNS = ["File", "Duration", "Status", "Progress"]
 
@@ -114,6 +110,12 @@ class MainWindow(QMainWindow):
         self.act_cancel.setEnabled(False)
         self.act_cancel.triggered.connect(self.cancel_batch)
 
+        self.act_stems = QAction("Separate stems", self)
+        self.act_stems.setShortcut("Ctrl+Shift+S")
+        self.act_stems.setToolTip("Split into vocals and instrumental with Demucs")
+        self.act_stems.setEnabled(False)
+        self.act_stems.triggered.connect(self.open_stem_dialog)
+
     def _build_ui(self) -> None:
         toolbar = QToolBar("Main")
         toolbar.setMovable(False)
@@ -123,6 +125,8 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
         toolbar.addAction(self.act_start)
         toolbar.addAction(self.act_cancel)
+        toolbar.addSeparator()
+        toolbar.addAction(self.act_stems)
         self.addToolBar(toolbar)
 
         central = QWidget()
@@ -264,6 +268,18 @@ class MainWindow(QMainWindow):
         self.queue_hint = QLabel("Drop audio files here, or use Add files")
         self.queue_hint.setStyleSheet("color: #6d7787;")
         header.addWidget(self.queue_hint)
+
+        self.play_btn = QPushButton("Play")
+        self.play_btn.setEnabled(False)
+        self.play_btn.setToolTip("Preview the selected file")
+        self.play_btn.clicked.connect(self.play_selected)
+        header.addWidget(self.play_btn)
+
+        self.separate_btn = QPushButton("Separate stems")
+        self.separate_btn.setEnabled(False)
+        self.separate_btn.setToolTip("Split the selected file (or the whole queue) into stems")
+        self.separate_btn.clicked.connect(self.open_stem_dialog)
+        header.addWidget(self.separate_btn)
         layout.addLayout(header)
 
         self.table = QTableWidget(0, len(COLUMNS))
@@ -347,6 +363,9 @@ class MainWindow(QMainWindow):
         toggle_log.setText("Activity log")
         view_menu.addAction(toggle_log)
 
+        tools_menu = self.menuBar().addMenu("&Tools")
+        tools_menu.addAction(self.act_stems)
+
         help_menu = self.menuBar().addMenu("&Help")
         about = QAction("About Airlift Audio", self)
         about.triggered.connect(self.show_about)
@@ -362,6 +381,9 @@ class MainWindow(QMainWindow):
         self.output_edit.setText(str(s.value("output_dir", "")))
         index = self.device_combo.findData(s.value("device", "auto"))
         self.device_combo.setCurrentIndex(max(0, index))
+        self.demucs_python = str(
+            s.value("demucs_python", os.environ.get("AIRLIFT_DEMUCS_PYTHON", ""))
+        )
         self.chunk_spin.setValue(float(s.value("chunk_seconds", 6.0)))
         self.overlap_spin.setValue(float(s.value("overlap_seconds", 1.0)))
         self.pad_spin.setValue(float(s.value("pad_seconds", 1.0)))
@@ -377,6 +399,7 @@ class MainWindow(QMainWindow):
         s.setValue("format", self.format_combo.currentData())
         s.setValue("output_dir", self.output_edit.text())
         s.setValue("device", self.device_combo.currentData())
+        s.setValue("demucs_python", self.demucs_python)
         s.setValue("chunk_seconds", self.chunk_spin.value())
         s.setValue("overlap_seconds", self.overlap_spin.value())
         s.setValue("pad_seconds", self.pad_spin.value())
@@ -421,9 +444,56 @@ class MainWindow(QMainWindow):
         if added:
             self.queue_hint.setVisible(False)
             self.act_start.setEnabled(True)
+            self.act_stems.setEnabled(True)
+            self.separate_btn.setEnabled(True)
             self._log(f"Added {added} file(s).")
+            if self.table.currentRow() < 0 and self.table.rowCount() > 0:
+                self.table.selectRow(0)
         elif paths:
             self._log("No new audio files found (unsupported or duplicate).")
+
+    def open_stem_dialog(self) -> None:
+        row = self.table.currentRow()
+        if 0 <= row < len(self.jobs):
+            files = [self.jobs[row]]
+        else:
+            files = list(self.jobs)
+        if not files:
+            QMessageBox.information(
+                self, APP_NAME, "Add audio files to the queue first."
+            )
+            return
+
+        from .stem_dialog import StemDialog
+
+        out = self.output_edit.text().strip()
+        dialog = StemDialog(
+            files,
+            device=self.device_combo.currentData(),
+            output_dir=Path(out).expanduser() if out else None,
+            demucs_python=self.demucs_python or None,
+            parent=self,
+        )
+        dialog.stems_ready.connect(self._add_stems)
+        dialog.exec()
+        self.demucs_python = dialog.python_edit.text().strip()
+
+    def _add_stems(self, paths: list[str]) -> None:
+        self._add_paths([Path(path) for path in paths])
+        self._log(f"Added {len(paths)} separated stem(s) to the queue.")
+
+    def play_selected(self) -> None:
+        row = self.table.currentRow()
+        if not (0 <= row < len(self.jobs)):
+            return
+        path = self.jobs[row]
+        result = self.results.get(str(path))
+        if result is not None:
+            self._show_detail(row)
+        else:
+            self.player.set_sources(path, None)
+        if MULTIMEDIA and self.player.player is not None:
+            self.player.player.play()
 
     def _append_row(self, path: Path) -> None:
         row = self.table.rowCount()
@@ -438,7 +508,7 @@ class MainWindow(QMainWindow):
             info = sf.info(str(path))
             seconds = info.frames / info.samplerate if info.samplerate else 0
             duration = f"{int(seconds // 60)}:{int(seconds % 60):02d}"
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         dur_item = QTableWidgetItem(duration)
         dur_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -461,6 +531,9 @@ class MainWindow(QMainWindow):
         if not self.jobs:
             self.queue_hint.setVisible(True)
             self.act_start.setEnabled(False)
+            self.act_stems.setEnabled(False)
+            self.separate_btn.setEnabled(False)
+            self.play_btn.setEnabled(False)
         self._clear_detail()
 
     def clear_all(self) -> None:
@@ -469,6 +542,9 @@ class MainWindow(QMainWindow):
         self.table.setRowCount(0)
         self.queue_hint.setVisible(True)
         self.act_start.setEnabled(False)
+        self.act_stems.setEnabled(False)
+        self.separate_btn.setEnabled(False)
+        self.play_btn.setEnabled(False)
         self._clear_detail()
 
     def _row_progress(self, row: int) -> QProgressBar | None:
@@ -546,11 +622,19 @@ class MainWindow(QMainWindow):
 
     def _set_running(self, running: bool) -> None:
         for action in (self.act_add, self.act_folder, self.act_remove,
-                       self.act_clear, self.act_start):
+                       self.act_clear, self.act_start, self.act_stems):
             action.setEnabled(not running)
         self.act_cancel.setEnabled(running)
         if not running:
             self.act_start.setEnabled(bool(self.jobs))
+            self.act_stems.setEnabled(bool(self.jobs))
+            self.separate_btn.setEnabled(bool(self.jobs))
+            self.play_btn.setEnabled(
+                (not running) and self.table.currentRow() >= 0 and MULTIMEDIA
+            )
+        else:
+            self.play_btn.setEnabled(False)
+            self.separate_btn.setEnabled(False)
 
     def _on_model_status(self, stage: str, fraction: float) -> None:
         self.status_label.setText(stage)
@@ -620,7 +704,7 @@ class MainWindow(QMainWindow):
         if self.restorer:
             try:
                 self.device_label.setText(describe_device(self.restorer.device))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.device_label.setText(self.restorer.device)
         self.status_label.setText("Cancelled" if cancelled else "Idle")
         self._log("Batch cancelled." if cancelled else "Batch finished.")
@@ -638,6 +722,8 @@ class MainWindow(QMainWindow):
         row = self.table.currentRow()
         if row >= 0:
             self._show_detail(row)
+
+        self.play_btn.setEnabled(row >= 0 and MULTIMEDIA)
 
     def _clear_detail(self) -> None:
         self.detail_title.setText("Select a finished file to inspect it.")
@@ -684,7 +770,7 @@ class MainWindow(QMainWindow):
         self.copy_btn.setEnabled(True)
         try:
             self.device_label.setText(describe_device(result.device))
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.device_label.setText(result.device)
 
     @staticmethod
@@ -707,8 +793,10 @@ class MainWindow(QMainWindow):
             return
         lines = [
             f"{result.source.name} -> {result.output.name}",
-            f"device: {result.device}  duration: {result.duration:.1f}s  "
-            f"elapsed: {result.elapsed:.1f}s",
+            (
+                f"device: {result.device}  duration: {result.duration:.1f}s  "
+                f"elapsed: {result.elapsed:.1f}s"
+            ),
             f"peak: {result.peak:.1f} dBFS  rms: {result.rms:.1f} dBFS",
             "",
             f"{'band':>10} {'original':>10} {'enhanced':>10} {'delta':>8}",
@@ -749,7 +837,7 @@ class MainWindow(QMainWindow):
                 block_seconds=8.0, repeats=1,
             )
             sf.write(target, clip, SAMPLE_RATE, subtype="PCM_24")
-        except Exception:
+        except Exception:  # noqa: BLE001
             QApplication.restoreOverrideCursor()
             QMessageBox.critical(self, APP_NAME,
                                  "Could not export the A/B clip:\n\n" + traceback.format_exc())

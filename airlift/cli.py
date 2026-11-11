@@ -21,6 +21,14 @@ from .core.audio import (
     measure_lufs,
 )
 from .core.pipeline import AUDIO_SUFFIXES, EnhanceOptions, enhance_file
+from .core.stems import (
+    DEFAULT_MODEL,
+    MODELS,
+    DemucsUnavailable,
+    StemOptions,
+    resolve_python,
+    separate_file,
+)
 
 
 def _collect(paths: list[str]) -> list[Path]:
@@ -144,6 +152,58 @@ def cmd_devices(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_separate(args: argparse.Namespace) -> int:
+    files = _collect(args.files)
+    if not files:
+        print("No audio files found.", file=sys.stderr)
+        return 2
+
+    try:
+        python = resolve_python(args.demucs_python)
+        device = resolve_device(args.device)
+    except (DemucsUnavailable, RuntimeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    print(f"{APP_NAME} {__version__}")
+    print(f"demucs: {python}")
+    print(f"device: {describe_device(device)}")
+
+    options = StemOptions(
+        model=args.model,
+        device=args.device,
+        output_dir=Path(args.output_dir).expanduser() if args.output_dir else None,
+        four_stems=args.four_stems,
+        fmt=args.format,
+        shifts=args.shifts,
+        overlap=args.overlap,
+        demucs_python=python,
+    )
+
+    failures = 0
+    for index, path in enumerate(files, 1):
+        print(f"\n[{index}/{len(files)}] {path.name}")
+
+        def progress(stage: str, fraction: float) -> None:
+            if not args.quiet:
+                print(f"\r  {stage:<12} {fraction*100:3.0f}%", end="", flush=True)
+
+        try:
+            result = separate_file(path, options, progress=progress)
+        except KeyboardInterrupt:
+            print("\nCancelled.")
+            return 130
+        except Exception as exc:  # noqa: BLE001 — keep the batch alive
+            failures += 1
+            print(f"\n  failed: {exc}", file=sys.stderr)
+            continue
+        for label, output in result.outputs.items():
+            print(f"\r  wrote {output}  ({label})                    ")
+        print(f"  {result.elapsed:.1f}s on {describe_device(result.device)}")
+
+    return 1 if failures else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="airlift-cli", description="Local AI music restoration (Apollo)."
@@ -184,6 +244,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     devices = sub.add_parser("devices", help="show torch device availability")
     devices.set_defaults(func=cmd_devices)
+
+    separate = sub.add_parser(
+        "separate", help="split tracks into vocals + instrumental (Demucs)"
+    )
+    separate.add_argument("files", nargs="+")
+    separate.add_argument("--model", choices=list(MODELS), default=DEFAULT_MODEL)
+    separate.add_argument("--device", default="auto",
+                          choices=["auto", "cpu", "cuda", "mps"])
+    separate.add_argument("-o", "--output-dir", default=None)
+    separate.add_argument("--four-stems", action="store_true",
+                          help="also write drums, bass and other")
+    separate.add_argument("--format", choices=["wav", "flac"], default="wav")
+    separate.add_argument("--shifts", type=int, default=1,
+                          help="more shifts = better quality, slower (default 1)")
+    separate.add_argument("--overlap", type=float, default=0.25)
+    separate.add_argument("--demucs-python", default=None,
+                          help="interpreter that can import demucs")
+    separate.add_argument("--quiet", action="store_true")
+    separate.set_defaults(func=cmd_separate)
     return parser
 
 

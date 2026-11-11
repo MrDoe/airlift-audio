@@ -15,8 +15,8 @@ jobs:
           python-version: "3.12"
       - name: Check version consistency
         run: |
-          grep -q 'version = "0.1.1"' pyproject.toml
-          grep -q '__version__ = "0.1.1"' airlift/__init__.py
+          grep -q 'version = "0.1.2"' pyproject.toml
+          grep -q '__version__ = "0.1.2"' airlift/__init__.py
       - name: Install CPU torch
         run: |
           python -m pip install --upgrade pip
@@ -26,7 +26,7 @@ jobs:
           pip install -e .
           pip install pytest ruff
       - name: Lint
-        run: ruff check .
+        run: ruff check airlift tests --exclude airlift/third_party --exclude airlift/third_party/apollo
       - name: Run tests
         run: pytest -q
       - name: CLI smoke
