@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -38,6 +39,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QSplitter,
     QStackedWidget,
@@ -301,6 +303,12 @@ class MainWindow(QMainWindow):
         self.preset_combo.setFixedWidth(104)
         self.preset_combo.currentIndexChanged.connect(self._apply_preset)
         header.addWidget(self.preset_combo)
+
+        self.reset_btn = QToolButton()
+        self.reset_btn.setIcon(icon("retry"))
+        self.reset_btn.setToolTip("Reset settings to defaults")
+        self.reset_btn.clicked.connect(self.reset_defaults)
+        header.addWidget(self.reset_btn)
         layout.addLayout(header)
 
         form = QFormLayout()
@@ -390,28 +398,32 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.advanced_toggle)
 
         self.advanced_panel = QWidget()
-        adv_form = QFormLayout(self.advanced_panel)
-        adv_form.setContentsMargins(0, 0, 0, 0)
-        adv_form.setHorizontalSpacing(10)
-        adv_form.setVerticalSpacing(8)
+        adv_grid = QGridLayout(self.advanced_panel)
+        adv_grid.setContentsMargins(0, 0, 0, 0)
+        adv_grid.setHorizontalSpacing(8)
+        adv_grid.setVerticalSpacing(8)
         self.chunk_spin = self._seconds_spin(6.0, 2.0, 30.0)
         self.overlap_spin = self._seconds_spin(1.0, 0.0, 5.0)
         self.pad_spin = self._seconds_spin(1.0, 0.0, 5.0)
         self.batch_spin = QSpinBox()
         self.batch_spin.setRange(1, 8)
         self.batch_spin.setValue(2)
-        adv_form.addRow("Chunk", self.chunk_spin)
-        adv_form.addRow("Overlap", self.overlap_spin)
-        adv_form.addRow("Pad", self.pad_spin)
-        adv_form.addRow("Batch", self.batch_spin)
+        adv_grid.addWidget(self.chunk_spin, 1, 0)
+        adv_grid.addWidget(self.overlap_spin, 1, 1)
+        adv_grid.addWidget(self.pad_spin, 1, 2)
+        adv_grid.addWidget(self.batch_spin, 1, 3)
+        for column, label in enumerate(("Chunk", "Overlap", "Pad", "Batch")):
+            caption = QLabel(label)
+            caption.setProperty("role", "muted")
+            adv_grid.addWidget(caption, 0, column)
+            adv_grid.setColumnStretch(column, 1)
+        for spin in (self.chunk_spin, self.overlap_spin, self.pad_spin, self.batch_spin):
+            spin.setMinimumWidth(0)
+            spin.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.advanced_panel.setVisible(False)
         layout.addWidget(self.advanced_panel)
 
         layout.addStretch(1)
-        self.reset_btn = QPushButton("Reset to defaults")
-        self.reset_btn.setProperty("variant", "ghost")
-        self.reset_btn.clicked.connect(self.reset_defaults)
-        layout.addWidget(self.reset_btn)
         return frame
 
     def _build_workspace(self) -> QWidget:
@@ -519,6 +531,8 @@ class MainWindow(QMainWindow):
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setAlternatingRowColors(True)
         table.setShowGrid(False)
+        table.setWordWrap(False)
+        table.setTextElideMode(Qt.ElideMiddle)
         table.verticalHeader().setVisible(False)
         table.verticalHeader().setDefaultSectionSize(42)
         table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -571,6 +585,7 @@ class MainWindow(QMainWindow):
         self.detail_stack.addWidget(empty)
 
         content = QWidget()
+        content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(8)
@@ -584,7 +599,10 @@ class MainWindow(QMainWindow):
         self.band_table.setShowGrid(False)
         self.band_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.band_table.verticalHeader().setDefaultSectionSize(21)
-        self.band_table.setMinimumHeight(280)
+        self.band_table.setMinimumHeight(60)
+        self.band_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         labels = band_labels()
         for row, label in enumerate(labels):
             item = QTableWidgetItem(label)

@@ -114,7 +114,7 @@ CUDA AppImage + `.deb` (Linux):
 ```bash
 PYTHON=~/.venvs/airlift-dev/bin/python VARIANT=cuda \
     bash packaging/linux/build_appimage.sh
-sudo apt install ./dist/airlift-audio-cuda_0.1.3_amd64.deb
+sudo apt install ./dist/airlift-audio-cuda_0.1.4_amd64.deb
 ```
 
 The CUDA bundle writes to `dist/Airlift Audio CUDA` and installs as
