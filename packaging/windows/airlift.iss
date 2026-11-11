@@ -1,5 +1,7 @@
 #define MyAppName "Airlift Audio"
-#define MyAppVersion "0.1.0"
+#ifndef MyAppVersion
+#define MyAppVersion "0.1.3"
+#endif
 #define MyAppPublisher "Airlift Audio contributors"
 #define MyAppExeName "Airlift Audio.exe"
 
