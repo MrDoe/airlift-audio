@@ -29,7 +29,9 @@ restoration. Python >= 3.10, setuptools, no lockfile. GUI and CLI share
 - Smoke: `airlift-audio --version`, `airlift-cli devices`. A bare
   `airlift-audio` launches the Qt GUI — avoid it in headless sessions.
 - CI test job: Python 3.12 on Ubuntu, torch 2.8.0 CPU, then install, lint,
-  `pytest -q`, and the two smoke commands.
+  `pytest -q`, and the two smoke commands. `ci.yml` triggers on `main` and pull
+  requests, but the default branch is `master` — a direct push to `master` runs
+  no checks, so open a PR when you want CI. Releases come from `v*` tags only.
 - `docs/*.png` are rendered, not captured: `python scripts/make_screenshots.py`
   drives `MainWindow` on Qt's offscreen platform with synthetic queue data.
   Point `XDG_CONFIG_HOME` at a temp dir before creating a `MainWindow` in any
