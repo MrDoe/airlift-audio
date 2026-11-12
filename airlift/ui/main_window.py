@@ -455,12 +455,6 @@ class MainWindow(QMainWindow):
         header.addWidget(self.duration_label)
         header.addStretch(1)
 
-        self.play_btn = QPushButton("Play")
-        self.play_btn.setIcon(icon("play", ACCENT))
-        self.play_btn.setToolTip("Play / pause the selected file")
-        self.play_btn.clicked.connect(self.toggle_play_selected)
-        header.addWidget(self.play_btn)
-
         self.separate_btn = QPushButton("Separate stems")
         self.separate_btn.setProperty("variant", "ghost")
         self.separate_btn.setIcon(icon("layers"))
@@ -579,7 +573,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(header)
 
         self.detail_stack = QStackedWidget()
-        empty = QLabel("Select a finished file to inspect its bands.")
+        empty = QLabel("Select any file to preview; finished files also show band details.")
         empty.setProperty("role", "muted")
         empty.setAlignment(Qt.AlignCenter)
         self.detail_stack.addWidget(empty)
@@ -609,12 +603,6 @@ class MainWindow(QMainWindow):
             item.setForeground(QColor(MUTED))
             self.band_table.setItem(row, 0, item)
         content_layout.addWidget(self.band_table, 1)
-
-        self.player = ABPlayer()
-        self.player.playing_changed.connect(self._on_playing_changed)
-        self.player.stopped.connect(self._on_player_stopped)
-        self.player.source_changed.connect(self._on_player_source_changed)
-        content_layout.addWidget(self.player)
 
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
@@ -648,6 +636,14 @@ class MainWindow(QMainWindow):
         self.detail_stack.addWidget(content)
         self.detail_stack.setCurrentIndex(0)
         layout.addWidget(self.detail_stack, 1)
+
+        # One transport for every file: keep it outside the detail stack so
+        # previewing a pending item still exposes play/pause, seek and volume.
+        self.player = ABPlayer()
+        self.player.playing_changed.connect(self._on_playing_changed)
+        self.player.stopped.connect(self._on_player_stopped)
+        self.player.source_changed.connect(self._on_player_source_changed)
+        layout.addWidget(self.player)
         return panel
 
     def _build_menu(self) -> None:
@@ -1035,7 +1031,7 @@ class MainWindow(QMainWindow):
         self.duration_label.setText(f"· {_fmt_duration(total)} total" if total else "")
         self.queue_stack.setCurrentWidget(self.table if count else self.empty_state)
         self._sync_actions()
-        self._update_play_button()
+        self._update_play_action()
 
     def _sync_actions(self) -> None:
         has_jobs = bool(self.jobs)
@@ -1070,14 +1066,13 @@ class MainWindow(QMainWindow):
         self.enhance_btn.setEnabled(enabled)
         self.cancel_btn.setVisible(running)
         self.cancel_btn.setEnabled(running)
-        self.play_btn.setEnabled(has_current and MULTIMEDIA)
         self.separate_btn.setEnabled(enabled)
         self.remove_btn.setEnabled(enabled)
         self.clear_btn.setEnabled(enabled)
         self.settings_panel.setEnabled(not running)
         self.reset_btn.setEnabled(not running)
 
-    def _update_play_button(self) -> None:
+    def _update_play_action(self) -> None:
         row = self.table.currentRow()
         has_current = 0 <= row < len(self.jobs)
         current_key = str(self.jobs[row]) if has_current else None
@@ -1085,10 +1080,6 @@ class MainWindow(QMainWindow):
             current_key
             and current_key == self._playing_path
             and self.player.is_playing()
-        )
-        self.play_btn.setText("Pause" if playing else "Play")
-        self.play_btn.setIcon(
-            icon("pause", ACCENT) if playing else icon("play", ACCENT)
         )
         self.act_play.setText("Pause selected" if playing else "Play / pause selected")
 
@@ -1173,21 +1164,17 @@ class MainWindow(QMainWindow):
 
         if key == self._playing_path:
             self.player.toggle_play()
-            self._update_play_button()
+            self._update_play_action()
             return
 
         if self.player.is_playing() or self.player.has_media():
             self.player.stop()
         self._playing_path = key
         self._set_playing_row(row)
-        result = self.results.get(key)
-        if result is not None:
-            self._show_detail(row)
-        else:
-            self.player.set_sources(path, None)
+        self._show_detail(row)
         self.player.play()
         self._update_playback_status()
-        self._update_play_button()
+        self._update_play_action()
 
     def stop_playback(self) -> None:
         self.player.stop()
@@ -1198,7 +1185,7 @@ class MainWindow(QMainWindow):
             if 0 <= row < len(self.jobs):
                 self._playing_path = str(self.jobs[row])
                 self._set_playing_row(row)
-        self._update_play_button()
+        self._update_play_action()
         if self.player.is_playing():
             self._update_playback_status()
         elif (
@@ -1216,7 +1203,7 @@ class MainWindow(QMainWindow):
         self._playing_path = None
         if not self._running:
             self.status_label.setText("Ready")
-        self._update_play_button()
+        self._update_play_action()
 
     def _on_player_source_changed(self, _source: str) -> None:
         if self._playing_path:
@@ -1234,7 +1221,7 @@ class MainWindow(QMainWindow):
             self._show_detail(row)
         else:
             self._clear_detail()
-        self._update_play_button()
+        self._update_play_action()
         self._sync_actions()
 
     def remove_selected(self) -> None:

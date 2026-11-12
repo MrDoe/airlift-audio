@@ -27,9 +27,10 @@ hallucinated edges of a pure super-resolution model.
   compensates for Apollo's measurable treble tilt.
 - **Batch queue**: add files or a whole folder, multi-select, retry failed
   items, clear completed, process sequentially and cancel any time.
-- **Transport controls**: Play/Pause/Stop in the queue and the comparison
-  panel; double-click a row or press Space to preview. Finished files play
-  the enhanced version, pending files play the original.
+- **Transport controls**: one play/pause, stop and seek bar under the
+  comparison panel. The same controls follow whichever row is selected, so a
+  pending file previews before it is enhanced; finished files add the A/B
+  switch. Double-click a row or press Space.
 - **A/B listening**: switch between original and enhanced at the same
   position, with loudness-matched clip export and the band-delta table.
 - **Studio-style UI**: settings rail with presets, status chips, per-row
@@ -132,9 +133,11 @@ next to the source.
 
 The left rail holds the restoration settings, presets and advanced chunking
 options. The queue supports multi-select, a context menu, retry failed and
-clear completed. **Play** previews the selected file, **Separate stems**
-opens the Demucs dialog, and the comparison panel appears once a file has
-been enhanced.
+clear completed. One transport under the comparison panel previews whatever
+row is selected: pending rows play the original, enhanced rows get the A/B
+switch and the band-delta table. **Separate stems** opens the Demucs dialog.
+
+![Transport on a pending row](docs/screenshot-transport.png)
 
 **Tools → Separate stems** runs Demucs on the selected file (or the whole
 queue) and writes `<name>.vocals.wav` plus `<name>.instrumental.wav`; tick
@@ -184,11 +187,11 @@ airlift/
   ui/          PySide6 window, A/B player, batch worker, theme
   third_party/ Apollo model code (unmodified, CC BY-SA 4.0)
 packaging/     PyInstaller spec + per-OS installer scripts
-scripts/       icon generation
+scripts/       icon and screenshot generation
 tests/         core + CLI tests
 
-OWL/ — documentation and specifications live in docs/; screenshots in
-docs/screenshot.png
+docs/ — the screenshots are rendered from demo data with
+`python scripts/make_screenshots.py` (headless, no model weights needed).
 ```
 
 ## Documentation
