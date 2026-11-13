@@ -192,15 +192,6 @@ docs/ — the screenshots are rendered from demo data with
 `python scripts/make_screenshots.py` (headless, no model weights needed).
 ```
 
-## Documentation
-
-- [Measured behaviour & benchmarks](#measured-behaviour-why-the-defaults) — why the
-  air shelf is +2.5 dB at 9 kHz, and what Apollo does to real tracks.
-- [Credits and licenses](#credits-and-licenses) — MIT app code, CC BY-SA Apollo
-  weights and model code.
-- [Limitations](#limitations) — 44.1 kHz ceiling, restoration-only scope,
-  CPU speed expectations.
-
 ## Credits and licenses
 
 - Application code: **MIT** (`LICENSE`).
