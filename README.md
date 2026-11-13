@@ -159,7 +159,7 @@ Every option has a `--help` entry; `airlift-cli` is the same dispatcher —
 for example, `airlift-cli devices` prints which backends are available.
 Use whichever entry point you have installed.
 
-## Measured behaviour (why the defaults)
+## Measured behaviour
 
 On a full 4:54 generated track, Apollo's restoration changed the average
 band energy relative to 1–8 kHz by:
