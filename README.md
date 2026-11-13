@@ -7,8 +7,6 @@ uploaded.
 
 ![Main window](docs/screenshot.png)
 
-![App icon](airlift/assets/icon.png)
-
 ## Why
 
 Lossy masters and generated tracks carry a characteristic "64 kbps" damage:
