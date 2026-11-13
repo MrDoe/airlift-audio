@@ -213,8 +213,8 @@ docs/ — the screenshots are rendered from demo data with
 
 ## Limitations
 
-- Output is 44.1 kHz, the model's native rate. Material above 22 kHz is not
-  possible; generated masters usually contain nothing there anyway.
+- Output is 44.1 kHz, the model's native rate. Material above 44.1 kHz is not
+  possible.
 - Apollo is a restoration model, not a mastering suite: it removes codec
   damage but adds no arrangement, level or dynamics changes.
 - CPU inference is roughly 0.5–1× the track length (the bundled installers
